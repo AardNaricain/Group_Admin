@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+<plugin
+   name="GroupAdmin"
+   author="Areia"
+   id="de5cc8adc920f3346d9bdf67"
+   language="Lua"
+   purpose="Group management"
+   save_state="y"
+   date_written="2020-11-10 11:00:00"
+   requires="5.06"
+   version="1.0"
+   >
+<description trim="y">
+<![CDATA[
+]]>
+</description>
+
+</plugin>
+
+<include name="constants.lua"/>
+
+
+
+<aliases>
+    <alias
+     match="^autoin(?:v|vi|vit|vite)(?:\s+(?<setting>on|off))?$"
+     enabled="y"
+     script="set_auto"
+     regexp="y"
+     ignore_case="y"
+     sequence="100"
+    >
+    </alias>
+    <alias
+     match="^autoin(?:v|vi|vit|vite)\s+msg(?:\s+(?<msg>.+))?$"
+     enabled="y"
+     script="set_msg"
+     regexp="y"
+     ignore_case="y"
+     sequence="100"
+    >
+    </alias>
+    <alias
+     match="^autoin(?:v|vi|vit|vite)\s+li?st?(?:\s+(?<player>\w+))?$"
+     enabled="y"
+     script="invite_list"
+     regexp="y"
+     ignore_case="y"
+     sequence="100"
+    >
+    </alias>
+    <alias
+     match="^autoin(?:v|vi|vit|vite)\s+he?lp$"
+     enabled="y"
+     script="invite_help"
+     regexp="y"
+     ignore_case="y"
+     sequence="100"
+    >
+    </alias>
+</aliases>
+
+
+
+<triggers>
+    <trigger
+     group="Auto_Invite"
+     match="^CLAN: The Crusader (?<player>\w+) returns to the fight against evil, bringing reinforcements\.$"
+     enabled="n"
+     script="auto_invite"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
+    <trigger
+     group="Auto_Invite"
+     match="^\(Friend\): (?<player>\w+) has entered Aardwolf\.$"
+     enabled="n"
+     script="auto_invite"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
+</triggers>
+
+
+
+<script>
+<![CDATA[
+require "commas"
+require "gmcphelper"
+require "serialize"
+require "var"
+require "tprint"
+dofile(GetInfo(60) .. "aardwolf_colors.lua")
+
+char = nil
+group = nil
+lastTriggerInvite = {name="", time=os.clock()}
+activeStates = {
+    ["3"] = true, -- active
+    ["8"] = true, -- fighting
+    ["9"] = true, -- sleeping
+    ["11"] = true, -- sleeping
+    ["12"] = true, -- running
+} -- States that allow for sending tells/gtells/invites
+
+function OnPluginEnable()
+    var.inviteMsg = var.inviteMsg or "invite"
+    var.auto = var.auto or "1"
+    if (var.auto == "1") then
+        EnableTriggerGroup("Auto_Invite", true)
+    end
+    if (var.inviteList) then
+        -- Have an invite table saved. Load it.
+        inviteList = loadstring("return " .. var.inviteList)()
+    else
+        -- Initialize
+        inviteList = {}
+        save_invite_list()
+    end
+    if (IsConnected()) then
+        OnPluginConnect()
+    end
+end -- OnPluginEnable
+
+function OnPluginInstall()
+    OnPluginEnable()
+    ColourNote("silver", "black", "GroupAdmin plugin installed. Type '", "yellow", "", "autoinvite help", "silver", "", "' for commands.")
+end -- OnPluginInstall
+
+function OnPluginConnect()
+    Send_GMCP_Packet("group on")
+    if (not char) then
+        Send_GMCP_Packet("request char")
+    end
+    if (not group) then
+        Send_GMCP_Packet("request group")
+    end
+end -- OnPluginConnect
+
+function OnPluginBroadcast(msg, id, name, text)
+    if (id == "3e7dedbe37e44942dd46d264") then -- GMCP handler
+        if (text == "char.base") then
+            char = gmcp("char.base")
+        
+        elseif (text == "group") then
+            group = gmcp("group")
+            if (group.groupname == "") then
+                -- Not in group
+                group = nil
+            end
+        
+        elseif (text == "comm.channel") then
+            local comm = gmcp("comm.channel")
+            if (comm.chan == "gtell") then
+                on_gtell(comm)
+            elseif (comm.chan == "tell") then
+                on_tell(comm)
+            end
+        
+        end
+    end
+end -- OnPluginBroadcast
+
+function set_auto(alias, line, wc)
+    local setting = wc.setting:lower()
+    if (setting == "") then
+        -- No arg. Toggle.
+        var.auto = var.auto == "1" and "0" or "1"
+        if (var.auto == "1") then
+            EnableTriggerGroup("Auto_Invite", true)
+        else
+            EnableTriggerGroup("Auto_Invite", false)
+        end
+    elseif (setting == "on") then
+        var.auto = "1"
+        EnableTriggerGroup("Auto_Invite", true)
+    elseif (setting == "off") then
+        var.auto = "0"
+        EnableTriggerGroup("Auto_Invite", false)
+    end
+    local msg = "Members of your auto-invite list will %s be invited to the group."
+    ColourNote("silver", "black", msg:format(var.auto == "1" and "now" or "no longer"))
+end -- set_auto
+
+function set_msg(alias, line, wc)
+    local msg = trim(wc.msg)
+    if (msg ~= "") then
+        var.inviteMsg = msg
+    end
+    ColourNote("silver", "black", "Auto-invite message is: ", "yellow", "", var.inviteMsg)
+end -- set_msg
+
+function in_table(t, e)
+    -- NOTE: Expects that t is a table of number-string pairs!
+    for k, v in ipairs(t) do
+        if (e:lower() == v:lower()) then
+            return true
+        end
+    end
+    return false
+end -- in_table
+
+function in_group(name)
+    if (not group) then
+        return false
+    end
+    local members = {}
+    for i, member in ipairs(group.members) do
+        table.insert(members, member.name)
+    end
+    return in_table(members, name)
+end -- in_group
+
+function in_invite_list(name)
+    -- Always assume char can execute commands without having to add themselves to the list
+    return char and char.name:lower() == name:lower() and true or in_table(inviteList, name)
+end -- in_invite_list
+
+function display_invite_list()
+    if (not next(inviteList)) then
+        ColourNote("silver", "black", "No members in your auto invite list.")
+        ColourNote("silver", "black", "Type '", "yellow", "", "autoinvite <player>", "silver", "", "' to add/remove a player.")
+        return
+    end
+    ColourNote("white", "black", "Auto-Invite List:")
+    for i, member in ipairs(inviteList) do
+        ColourNote("yellow", "black", member)
+    end
+end -- display_invite_list
+
+function sort_invite_list()
+    table.sort(inviteList)
+end -- sort_invite_list
+
+function save_invite_list()
+    sort_invite_list()
+    var.inviteList = serialize.save_simple(inviteList)
+end -- save_invite_list
+
+function add_invite_list(name)
+    table.insert(inviteList, name)
+    save_invite_list()
+end -- add_invite_list
+
+function remove_invite_list(name)
+    for i, member in ipairs(inviteList) do
+        if (name:lower() == member:lower()) then
+            table.remove(inviteList, i)
+        end
+    end
+    save_invite_list()
+end -- remove_invite_list
+
+function clear_invite_list()
+    inviteList = {}
+    save_invite_list()
+end -- clear_invite_list
+
+function invite_list(alias, line, wc)
+    if (wc.player == "") then
+        -- No arg. Display list.
+        display_invite_list()
+        return
+    end
+    if (wc.player:lower() == "clear") then
+        clear_invite_list()
+        ColourNote("silver", "black", "Auto-invite list cleared.")
+        return
+    end
+    if (in_invite_list(wc.player)) then
+        remove_invite_list(wc.player)
+        ColourNote("silver", "black", "Removed ", "yellow", "", wc.player, "silver", "", " from auto-invite list.")
+    else
+        add_invite_list(wc.player)
+        ColourNote("silver", "black", "Added ", "yellow", "", wc.player, "silver", "", " to auto-invite list.")
+        auto_invite(nil, nil, wc)
+    end
+end -- invite_list
+
+function is_leader()
+    return char and group and char.name == group.leader
+end -- is_leader
+
+function can_auto_respond()
+    return var.auto == "1" and activeStates[gmcp("char.status.state")]
+end -- can_auto_respond
+
+function auto_invite(trigger, line, wc)
+    if (can_auto_respond() and is_leader() and in_invite_list(wc.player)
+    and not in_group(wc.player)) then
+        -- make sure not to invite the same person twice in a row (e.g., player is on both ct and ft)
+        local now = os.clock()
+        if (lastTriggerInvite.name == wc.player
+        and now - lastTriggerInvite.time < 30) then
+            return
+        end -- same player as last time
+        lastTriggerInvite.name = wc.player
+        lastTriggerInvite.time = now
+        Send("group invite " .. wc.player)
+    end
+end -- auto_invite
+
+function send_gtell(msg)
+    local cmd = "gtell @M=@WGroupAdmin@M= @w%s$C"
+    Send(cmd:format(msg))
+end -- send_gtell
+
+function extract_msg(comm)
+    return strip_colours(comm.msg):match("'(.+)'$") or ""
+end -- extract_msg
+
+function on_gtell(comm)
+    if (can_auto_respond() and is_leader() and in_invite_list(comm.player)) then
+        local msg = extract_msg(comm)
+        local regexCmd = rex.new(
+            "^(?<cmd>" .. var.inviteMsg .. "|leader|promo|promote|rename|cmds|commands)(?:\\s+(?<target>.+))?$",
+            rex.flags().CASELESS
+        )
+        local first, last, captures = regexCmd:match(msg)
+        if (captures) then -- line matched
+            local cmd = captures.cmd:lower()
+            -- If line matched but `targets` is empty (e.g., entered the 'commands'
+            -- command), `captures.target` will be false, not an empty string.
+            local target = type(captures.target) == "string" and trim(captures.target) or captures.target
+            if (cmd == var.inviteMsg:lower()) then
+                if (not target or target:find("%W")) then
+                    return
+                end -- invalid target
+                if (in_group(target)) then
+                    send_gtell(string.format("%s is already in the group.", target))
+                else
+                    send_gtell(string.format("Sending an invite to %s for %s.", target, comm.player))
+                    Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
+                    Send("group invite " .. target)
+                end -- target in group
+            elseif (in_table({"leader", "promote", "promo"}, cmd)) then
+                if (not target or target:find("%W")) then
+                    return
+                end -- invalid target
+                if (in_group(target)) then
+                    if (target:lower() == group.leader:lower()) then
+                        send_gtell(string.format("%s is already the group leader.", target))
+                    else
+                        send_gtell(string.format("Passing lead to %s for %s.", target, comm.player))
+                        Send("group promote " .. target)
+                    end -- if target already leader
+                else
+                    send_gtell(string.format("%s is not a member of the group.", target))
+                end -- target in group
+            elseif (cmd == "rename") then
+                if (not target) then
+                    return
+                end -- invalid target
+                send_gtell(string.format("Renaming the group for %s.", comm.player))
+                Send("group rename " .. target)
+            elseif (in_table({"cmds", "commands"}, cmd)) then
+                send_gtell(string.format("@Wcommands@w: @Y%s <player>@w, @Yleader <player>@w, @Yrename <name>@w.", var.inviteMsg))
+            end -- command checks
+        end -- found command
+    end -- if should look for commands
+end -- on_gtell
+
+function on_tell(comm)
+    if (char and char.name ~= comm.player and can_auto_respond()
+    and in_invite_list(comm.player) and not in_group(comm.player)) then
+        local msg = extract_msg(comm)
+        local regexCmd = rex.new(
+            "^" .. var.inviteMsg .. "$", rex.flags().CASELESS
+        )
+        local found = regexCmd:match(msg)
+        if (found) then
+            if (is_leader()) then
+                send_gtell(string.format("%s has asked to join the group.", comm.player))
+                Send("group invite " .. comm.player)
+            else
+                if (group) then
+                    Send(string.format("tell %s %s is our group leader at the moment. Ask them.", comm.player, group.leader))
+                else
+                    Send(string.format("tell %s I'm not in a group at the moment.", comm.player))
+                end -- in group
+            end -- if leader
+        end -- if command found
+    end -- if should look for command
+end -- on_tell
+
+function invite_help(alias, line, wc)
+ColourNote("white", "black", string.rep(" ", 30), "", "", "Auto-Invite Commands", "", "", string.rep(" ", 30))
+ColourNote("silver", "black", string.rep("-", 80))
+ColourNote("yellow", "black", "autoinvite [on|off]", "silver", "", ":      Toggle/turn on/off automatic actions, essentially dis-")
+ColourNote("silver", "black", "                          abling the plugin.                                    ")
+ColourNote("yellow", "black", "autoinvite list [player]: With no argument, shows your auto-invite list. Other- ")
+ColourNote("silver", "black", "                          wise adds/removes player from the list.               ")
+ColourNote("yellow", "black", "autoinvite msg [string]:  With no argument, shows your current auto-invite mes- ")
+ColourNote("silver", "black", "                          sage. Otherwise changes it to the given string. This  ")
+ColourNote("silver", "black", "                          is what others tell/gtell to get invites from you.    ")
+ColourNote("silver", "black", "Also, you and those on your invite list can say 'commands' on gtell to see syn- ")
+ColourNote("silver", "black", "tax for group commands.                                                         ")
+ColourNote("silver", "black", string.rep("-", 80))
+end -- invite_help
+]]>
+</script>
+
+
+</muclient>
