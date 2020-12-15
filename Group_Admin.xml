@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.0"
+   version="1.10"
    >
 <description trim="y">
 <![CDATA[
@@ -56,6 +56,16 @@
      match="^autoin(?:v|vi|vit|vite)\s+he?lp$"
      enabled="y"
      script="invite_help"
+     regexp="y"
+     ignore_case="y"
+     sequence="100"
+    >
+    </alias>
+    
+    <alias
+     match="^autoin(?:v|vi|vit|vite)\s+update$"
+     enabled="y"
+     script="update_plugin"
      regexp="y"
      ignore_case="y"
      sequence="100"
@@ -398,10 +408,43 @@ ColourNote("silver", "black", "                          wise adds/removes playe
 ColourNote("yellow", "black", "autoinvite msg [string]:  With no argument, shows your current auto-invite mes- ")
 ColourNote("silver", "black", "                          sage. Otherwise changes it to the given string. This  ")
 ColourNote("silver", "black", "                          is what others tell/gtell to get invites from you.    ")
+ColourNote("yellow", "black", "autoinvite update", "silver", "", ": Checks for and, if found, installs plugin updates.")
 ColourNote("silver", "black", "Also, you and those on your invite list can say 'commands' on gtell to see syn- ")
 ColourNote("silver", "black", "tax for group commands.                                                         ")
 ColourNote("silver", "black", string.rep("-", 80))
 end -- invite_help
+
+function update_plugin(alias, line, wc)
+    raw = https://raw.githubusercontent.com/AreiaAard/Group_Admin/main/Group_Admin.xml
+    async_ok, async = pcall (require, "async")
+    if async_ok then
+        plugin_page = async.doAsyncRemoteRequest(raw, raw_get, "HTTPS")
+    else
+        ColourNote("white", "blue", "Error on plugin update!")
+    end
+end
+
+function raw_get(retval, page, status, headers, full_status, request_url)
+    local PLUGIN_NAME = GetPluginInfo(GetPluginID(), 1)
+    local PLUGIN_VERSION = GetPluginInfo(GetPluginID(), 19)
+    if status == 200 then
+        raw_version = tonumber(string.match(page, '%s%s+version="([0-9%.]+)"'))
+    end
+    if raw_version == PLUGIN_VERSION then
+        ColourNote("white", "blue", PLUGIN_NAME .. " is up-to-date.")
+    elseif raw_version > PLUGIN_VERSION then
+        ColourNote("white", "blue", "Updating " .. PLUGIN_NAME .. " from version " .. PLUGIN_VERSION .. " to " .. raw_version .. ". Do not touch anything!")
+        local file = io.open(GetPluginInfo(GetPluginID(), 6), "w")
+        file:write(page)
+        file:close()
+    end
+    raw_version = nil
+    if "" == GetAlphaOption("script_prefix") then
+        SetAlphaOption("script_prefix", "\\\\\\")
+    end
+    Execute(GetAlphaOption("script_prefix") .. "DoAfterSpecial(1, \"ReloadPlugin('" .. GetPluginID() .. "')\", sendto.script)")
+    ColourNote("white", "blue", "Update complete!")
+end -- end Update code
 ]]>
 </script>
 
