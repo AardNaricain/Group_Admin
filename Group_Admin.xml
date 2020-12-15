@@ -415,7 +415,7 @@ ColourNote("silver", "black", string.rep("-", 80))
 end -- invite_help
 
 function update_plugin(alias, line, wc)
-    raw = https://raw.githubusercontent.com/AreiaAard/Group_Admin/main/Group_Admin.xml
+    raw = "https://raw.githubusercontent.com/AreiaAard/Group_Admin/main/Group_Admin.xml"
     async_ok, async = pcall (require, "async")
     if async_ok then
         plugin_page = async.doAsyncRemoteRequest(raw, raw_get, "HTTPS")
