@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.11"
+   version="1.12"
    >
 <description trim="y">
 <![CDATA[
@@ -104,6 +104,24 @@
      sequence="100"
     >
     </trigger>
+    <trigger
+     group="After_Invite"
+     match="^(You invite .+ to join group: .+\.|.+ has already been invited into this group\.)$"
+     enabled="n"
+     script="invite_success"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
+    <trigger
+     group="After_Invite"
+     match="^You don't see a player with that name\.$"
+     enabled="n"
+     script="invite_fail"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
 </triggers>
 
 
@@ -149,7 +167,7 @@ end -- OnPluginEnable
 
 function OnPluginInstall()
     OnPluginEnable()
-    ColourNote("silver", "black", "GroupAdmin plugin installed. Type '", "yellow", "", "autoinvite help", "silver", "", "' for commands.")
+    ColourNote("silver", "black", "GroupAdmin plugin v".. GetPluginInfo(GetPluginID(), 19) .." installed. Type '", "yellow", "", "autoinvite help", "silver", "", "' for commands.")
 end -- OnPluginInstall
 
 function OnPluginConnect()
@@ -325,6 +343,15 @@ function auto_invite(trigger, line, wc)
     end
 end -- auto_invite
 
+function invite_success()
+    EnableTriggerGroup("After_Invite", false)
+end
+
+function invite_fail()
+    EnableTriggerGroup("After_Invite", false)
+    send_gtell("Could not invite that player. Maybe they're invisible or offline?")
+end
+
 function send_gtell(msg)
     local cmd = "gtell @M=@WGroupAdmin@M= @w%s$C"
     Send(cmd:format(msg))
@@ -357,6 +384,7 @@ function on_gtell(comm)
                     send_gtell(string.format("Sending an invite to %s for %s.", target, comm.player))
                     Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
                     Send("group invite " .. target)
+                    EnableTriggerGroup("After_Invite", true)
                 end -- target in group
             elseif (in_table({"leader", "promote", "promo"}, cmd)) then
                 if (not target or target:find("%W")) then
@@ -415,7 +443,8 @@ function on_gtell(comm)
                         Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
                     end
                     send_gtell(msg)
-                    auto_invite(nil, nil, {player = target})
+                    Send("group invite " .. target)
+                    EnableTriggerGroup("After_Invite", true)
                 end
             elseif (in_table({"cmds", "commands"}, cmd)) then
                 send_gtell(string.format("@Wcommands@w: @Y%s <player>@w, @Yleader <player>@w, @Yrename <name>@w, @Yautoinvite@w, @Yautoinvite <name>@w.", var.inviteMsg))
