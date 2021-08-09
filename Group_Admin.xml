@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.10"
+   version="1.11"
    >
 <description trim="y">
 <![CDATA[
@@ -61,11 +61,21 @@
      sequence="100"
     >
     </alias>
-    
+
     <alias
      match="^autoin(?:v|vi|vit|vite)\s+update$"
      enabled="y"
      script="update_plugin"
+     regexp="y"
+     ignore_case="y"
+     sequence="100"
+    >
+    </alias>
+
+    <alias
+     match="^autoin(?:v|vi|vit|vite)\s+reload$"
+     enabled="y"
+     script="reload"
      regexp="y"
      ignore_case="y"
      sequence="100"
@@ -156,14 +166,14 @@ function OnPluginBroadcast(msg, id, name, text)
     if (id == "3e7dedbe37e44942dd46d264") then -- GMCP handler
         if (text == "char.base") then
             char = gmcp("char.base")
-        
+
         elseif (text == "group") then
             group = gmcp("group")
             if (group.groupname == "") then
                 -- Not in group
                 group = nil
             end
-        
+
         elseif (text == "comm.channel") then
             local comm = gmcp("comm.channel")
             if (comm.chan == "gtell") then
@@ -171,7 +181,7 @@ function OnPluginBroadcast(msg, id, name, text)
             elseif (comm.chan == "tell") then
                 on_tell(comm)
             end
-        
+
         end
     end
 end -- OnPluginBroadcast
@@ -328,7 +338,7 @@ function on_gtell(comm)
     if (can_auto_respond() and is_leader() and in_invite_list(comm.player)) then
         local msg = extract_msg(comm)
         local regexCmd = rex.new(
-            "^(?<cmd>" .. var.inviteMsg .. "|leader|promo|promote|rename|cmds|commands)(?:\\s+(?<target>.+))?$",
+            "^(?<cmd>" .. var.inviteMsg .. "|leader|promo|promote|rename|cmds|commands|autoinvite)(?:\\s+(?<target>.+))?$",
             rex.flags().CASELESS
         )
         local first, last, captures = regexCmd:match(msg)
@@ -368,8 +378,47 @@ function on_gtell(comm)
                 end -- invalid target
                 send_gtell(string.format("Renaming the group for %s.", comm.player))
                 Send("group rename " .. target)
+            elseif (cmd == "autoinvite") then
+                if (not target) then
+                    if #inviteList == 0 then
+                        send_gtell("There is no one on the autoinvite list.")
+                    else
+                        autoInviteString = ""
+                        print("actual ", table.concat(inviteList, ", "))
+                        for i, name in ipairs(inviteList) do
+                            name = name:gsub("^.", string.upper)
+                            autoInviteString = autoInviteString .. name
+                            if i == #inviteList - 1 then
+                                if i == 1 then
+                                    autoInviteString = autoInviteString .. " and "
+                                else
+                                    autoInviteString = autoInviteString .. ", and "
+                                end
+                            elseif i < #inviteList then
+                                autoInviteString = autoInviteString .. ", "
+                            end
+                        end
+                        send_gtell("The invite list contains: " .. autoInviteString)
+                    end
+                elseif target:lower() == group.leader:lower() then
+                    send_gtell("Don't try to remove the group leader from the autoinvite list.")
+                elseif (in_invite_list(target)) then
+                    remove_invite_list(target)
+                    send_gtell("Removed " .. target .. " from auto-invite list.")
+                else
+                    add_invite_list(target)
+                    msg = "Added " .. target .. " to auto-invite list"
+                    if in_group(target) then
+                        msg = msg .. "."
+                    else
+                        msg = msg .. " and invited them to the group."
+                        Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
+                    end
+                    send_gtell(msg)
+                    auto_invite(nil, nil, {player = target})
+                end
             elseif (in_table({"cmds", "commands"}, cmd)) then
-                send_gtell(string.format("@Wcommands@w: @Y%s <player>@w, @Yleader <player>@w, @Yrename <name>@w.", var.inviteMsg))
+                send_gtell(string.format("@Wcommands@w: @Y%s <player>@w, @Yleader <player>@w, @Yrename <name>@w, @Yautoinvite@w, @Yautoinvite <name>@w.", var.inviteMsg))
             end -- command checks
         end -- found command
     end -- if should look for commands
@@ -445,6 +494,11 @@ function raw_get(retval, page, status, headers, full_status, request_url)
     Execute(GetAlphaOption("script_prefix") .. "DoAfterSpecial(1, \"ReloadPlugin('" .. GetPluginID() .. "')\", sendto.script)")
     ColourNote("white", "blue", "Update complete!")
 end -- end Update code
+
+function reload()
+    ColourNote("silver", "black", "Reloading groupadmin.")
+    Execute(GetAlphaOption("script_prefix") .. "DoAfterSpecial(1, \"ReloadPlugin('" .. GetPluginID() .. "')\", sendto.script)")
+end
 ]]>
 </script>
 
