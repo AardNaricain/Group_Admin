@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.12"
+   version="1.13"
    >
 <description trim="y">
 <![CDATA[
@@ -98,6 +98,24 @@
     <trigger
      group="Auto_Invite"
      match="^\(Friend\): (?<player>\w+) has entered Aardwolf\.$"
+     enabled="n"
+     script="auto_invite"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
+    <trigger
+     group="Auto_Invite"
+     match="^INFO: (?<player>\w+) has been reborn as a .+$"
+     enabled="n"
+     script="auto_invite"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
+    <trigger
+     group="Auto_Invite"
+     match="^INFO: All please welcome (?<player>\w+) back from tier creation!$"
      enabled="n"
      script="auto_invite"
      regexp="y"
