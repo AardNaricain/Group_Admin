@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.13"
+   version="1.2"
    >
 <description trim="y">
 <![CDATA[
@@ -140,6 +140,14 @@
      sequence="100"
     >
     </trigger>
+    <trigger
+     match="^You entered: group invite (?<player>\w+)$"
+     enabled="y"
+     script="invite_echo"
+     regexp="y"
+     sequence="100"
+    >
+    </trigger>
 </triggers>
 
 
@@ -156,6 +164,7 @@ dofile(GetInfo(60) .. "aardwolf_colors.lua")
 char = nil
 group = nil
 lastTriggerInvite = {name="", time=os.clock()}
+lastInviteName = nil
 activeStates = {
     ["3"] = true, -- active
     ["8"] = true, -- fighting
@@ -377,7 +386,18 @@ end
 
 function invite_fail()
     EnableTriggerGroup("After_Invite", false)
-    send_gtell("Could not invite that player. Maybe they're invisible or offline?")
+    if lastInviteName then
+        send_gtell(string.format("Could not invite %s. Maybe they're invisible or offline?", lastInviteName))
+        Send(string.format("tell %s I can't see you. Maybe I'm a dum dum group leader who left my dectects off. Do `visto %s` and try again.", lastInviteName, char.name))
+    else
+        send_gtell("Could not invite that player. Maybe they're invisible or offline?")
+    end
+    lastInviteName = nil
+end
+
+function invite_echo(trigger, line, wc)
+    EnableTriggerGroup("After_Invite", true)
+    lastInviteName = wc.player
 end
 
 function send_gtell(msg)
@@ -388,6 +408,12 @@ end -- send_gtell
 function extract_msg(comm)
     return strip_colours(comm.msg):match("'(.+)'$") or ""
 end -- extract_msg
+
+function send_invite(name)
+    EnableTriggerGroup("After_Invite", true)
+    lastInviteName = name
+    Send("group invite " .. name)
+end
 
 function on_gtell(comm)
     if (can_auto_respond() and is_leader() and in_invite_list(comm.player)) then
@@ -411,8 +437,7 @@ function on_gtell(comm)
                 else
                     send_gtell(string.format("Sending an invite to %s for %s.", target, comm.player))
                     Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
-                    Send("group invite " .. target)
-                    EnableTriggerGroup("After_Invite", true)
+                    send_invite(target)
                 end -- target in group
             elseif (in_table({"leader", "promote", "promo"}, cmd)) then
                 if (not target or target:find("%W")) then
@@ -471,8 +496,7 @@ function on_gtell(comm)
                         Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
                     end
                     send_gtell(msg)
-                    Send("group invite " .. target)
-                    EnableTriggerGroup("After_Invite", true)
+                    send_invite(target)
                 end
             elseif (in_table({"cmds", "commands"}, cmd)) then
                 send_gtell(string.format("@Wcommands@w: @Y%s <player>@w, @Yleader <player>@w, @Yrename <name>@w, @Yautoinvite@w, @Yautoinvite <name>@w.", var.inviteMsg))
