@@ -525,7 +525,7 @@ function on_tell(comm)
                     end -- in group
                 end -- if leader
             elseif is_leader() then
-                Send(string.format("tell %s You're not on the list.", comm.player, group.leader))
+                Send(string.format("tell %s You're not on the autoinvite list.", comm.player, group.leader))
             end
         end -- if command found
     end -- if should look for command
