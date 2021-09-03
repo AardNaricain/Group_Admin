@@ -516,7 +516,7 @@ function on_tell(comm)
             if in_invite_list(comm.player) then
                 if (is_leader()) then
                     send_gtell(string.format("%s has asked to join the group.", comm.player))
-                    send_invite(target)
+                    send_invite(comm.player)
                 else
                     if (group) then
                         Send(string.format("tell %s %s is our group leader at the moment. Ask them.", comm.player, group.leader))
