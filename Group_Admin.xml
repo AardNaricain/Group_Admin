@@ -108,7 +108,7 @@
      group="Auto_Invite"
      match="^INFO: (?<player>\w+) has been reborn as a .+$"
      enabled="n"
-     script="auto_invite"
+     script="reinvite"
      regexp="y"
      sequence="100"
     >
@@ -117,7 +117,7 @@
      group="Auto_Invite"
      match="^INFO: All please welcome (?<player>\w+) back from tier creation!$"
      enabled="n"
-     script="auto_invite"
+     script="reinvite"
      regexp="y"
      sequence="100"
     >
@@ -347,19 +347,29 @@ function can_auto_respond()
 end -- can_auto_respond
 
 function auto_invite(trigger, line, wc)
-    if (can_auto_respond() and is_leader() and in_invite_list(wc.player)
-    and not in_group(wc.player)) then
+    do_invite(wc.player)
+end -- auto_invite
+
+function reinvite(trigger, line, wc)
+    if in_group(wc.player) then
+        do_invite(wc.player, true)
+    end
+end -- force_auto_invite
+
+function do_invite(name, force)
+    if (can_auto_respond() and is_leader() and in_invite_list(name)
+    and (not in_group(name) or force)) then
         -- make sure not to invite the same person twice in a row (e.g., player is on both ct and ft)
         local now = os.clock()
-        if (lastTriggerInvite.name == wc.player
+        if (lastTriggerInvite.name == name
         and now - lastTriggerInvite.time < 30) then
             return
         end -- same player as last time
-        lastTriggerInvite.name = wc.player
+        lastTriggerInvite.name = name
         lastTriggerInvite.time = now
-        Send("group invite " .. wc.player)
+        send_invite(name)
     end
-end -- auto_invite
+end -- do_invite
 
 function invite_success()
     EnableTriggerGroup("After_Invite", false)
