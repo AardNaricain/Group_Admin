@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.2"
+   version="1.21"
    >
 <description trim="y">
 <![CDATA[
@@ -298,8 +298,12 @@ function display_invite_list()
     end
 end -- display_invite_list
 
+function case_insensitive_sort(a, b)
+    return a:lower() < b:lower()
+end
+
 function sort_invite_list()
-    table.sort(inviteList)
+    table.sort(inviteList, case_insensitive_sort)
 end -- sort_invite_list
 
 function save_invite_list()
@@ -465,7 +469,6 @@ function on_gtell(comm)
                         send_gtell("There is no one on the autoinvite list.")
                     else
                         autoInviteString = ""
-                        print("actual ", table.concat(inviteList, ", "))
                         for i, name in ipairs(inviteList) do
                             name = name:gsub("^.", string.upper)
                             autoInviteString = autoInviteString .. name
