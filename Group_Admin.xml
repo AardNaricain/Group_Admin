@@ -489,6 +489,10 @@ function on_gtell(comm)
                 elseif (in_invite_list(target)) then
                     remove_invite_list(target)
                     send_gtell("Removed " .. target .. " from auto-invite list.")
+                elseif string.find(target:lower(), " butt") or string.find(target:lower(), " ass") then
+                    send_gtell("What is it with you and butts?")
+                elseif string.find(target:lower(), " mom") or string.find(target:lower(), " mother") then
+                    send_gtell("No, YOUR mom.")
                 else
                     add_invite_list(target)
                     msg = "Added " .. target .. " to auto-invite list"
