@@ -11,7 +11,7 @@
    save_state="y"
    date_written="2020-11-10 11:00:00"
    requires="5.06"
-   version="1.21"
+   version="1.22"
    >
 <description trim="y">
 <![CDATA[
@@ -464,46 +464,24 @@ function on_gtell(comm)
                 send_gtell(string.format("Renaming the group for %s.", comm.player))
                 Send("group rename " .. target)
             elseif (cmd == "autoinvite") then
-                if (not target) then
-                    if #inviteList == 0 then
-                        send_gtell("There is no one on the autoinvite list.")
-                    else
-                        autoInviteString = ""
-                        for i, name in ipairs(inviteList) do
-                            name = name:gsub("^.", string.upper)
-                            autoInviteString = autoInviteString .. name
-                            if i == #inviteList - 1 then
-                                if i == 1 then
-                                    autoInviteString = autoInviteString .. " and "
-                                else
-                                    autoInviteString = autoInviteString .. ", and "
-                                end
-                            elseif i < #inviteList then
-                                autoInviteString = autoInviteString .. ", "
-                            end
-                        end
-                        send_gtell("The invite list contains: " .. autoInviteString)
-                    end
-                elseif target:lower() == group.leader:lower() then
-                    send_gtell("Don't try to remove the group leader from the autoinvite list.")
-                elseif (in_invite_list(target)) then
-                    remove_invite_list(target)
-                    send_gtell("Removed " .. target .. " from auto-invite list.")
-                elseif string.find(target:lower(), " butt") or string.find(target:lower(), " ass") then
-                    send_gtell("What is it with you and butts?")
-                elseif string.find(target:lower(), " mom") or string.find(target:lower(), " mother") then
-                    send_gtell("No, YOUR mom.")
+                if #inviteList == 0 then
+                    send_gtell("There is no one on the autoinvite list.")
                 else
-                    add_invite_list(target)
-                    msg = "Added " .. target .. " to auto-invite list"
-                    if in_group(target) then
-                        msg = msg .. "."
-                    else
-                        msg = msg .. " and invited them to the group."
-                        Send(string.format("tell %s %s asked me to invite you to the group.", target, comm.player))
+                    autoInviteString = ""
+                    for i, name in ipairs(inviteList) do
+                        name = name:gsub("^.", string.upper)
+                        autoInviteString = autoInviteString .. name
+                        if i == #inviteList - 1 then
+                            if i == 1 then
+                                autoInviteString = autoInviteString .. " and "
+                            else
+                                autoInviteString = autoInviteString .. ", and "
+                            end
+                        elseif i < #inviteList then
+                            autoInviteString = autoInviteString .. ", "
+                        end
                     end
-                    send_gtell(msg)
-                    send_invite(target)
+                    send_gtell("The invite list contains: " .. autoInviteString)
                 end
             elseif (in_table({"cmds", "commands"}, cmd)) then
                 send_gtell(string.format("@Wcommands@w: @Y%s <player>@w, @Yleader <player>@w, @Yrename <name>@w, @Yautoinvite@w, @Yautoinvite <name>@w.", var.inviteMsg))
